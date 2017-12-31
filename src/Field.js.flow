@@ -8,6 +8,8 @@ export interface Field<A> extends Ring<A> {
   mod(x: A): (y: A) => A;
 }
 
+declare export var fieldInteger: Field<number>
+
 declare export var fieldNumber: Field<number>
 
 declare export var gcd: <A>(S: Setoid<A>, field: Field<A>) => (x: A) => (y: A) => A

@@ -4,14 +4,14 @@ import * as setoid from '../src/Setoid'
 
 describe('Field', () => {
   it('gcd', () => {
-    const gcd = field.gcd(setoid.setoidNumber, field.fieldNumber)
+    const gcd = field.gcd(setoid.setoidNumber, field.fieldInteger)
     assert.strictEqual(gcd(10)(5), 5)
     assert.strictEqual(gcd(10)(2), 2)
     assert.strictEqual(gcd(10)(3), 1)
   })
 
   it('lcm', () => {
-    const lcm = field.lcm(setoid.setoidNumber, field.fieldNumber)
+    const lcm = field.lcm(setoid.setoidNumber, field.fieldInteger)
     assert.strictEqual(lcm(4)(6), 12)
   })
 })
