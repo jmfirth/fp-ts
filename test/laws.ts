@@ -1,6 +1,7 @@
 import * as assert from 'assert'
 import {
   checkLaws,
+  getApplyLaws,
   getSetoidLaws,
   getOrdLaws,
   getSemiringLaws,
@@ -21,14 +22,26 @@ const IntegerGenerator: Generator<number> = gen.int
 const OptionStringGenerator: Generator<option.Option<string>> = gen.string.then(n => option.of(n))
 
 describe('laws', () => {
+  it('checkApplyLaws', () => {
+    const fagenerator = OptionStringGenerator
+    const SFA = option.getSetoid(setoidString)
+    const SFC = option.getSetoid(setoidBoolean)
+    const g = (s: string) => s.length
+    const f = (n: number) => n >= 2
+    const fab = option.option.of(g)
+    const fbc = option.option.of(f)
+    checkLaws(getApplyLaws(option.option)(fagenerator, SFA, SFC)(g, f, fab, fbc)).fold(assert.fail, () => undefined)
+  })
+
   it('checkFieldLaws', () => {
     checkLaws(getFieldLaws(fieldInteger, IntegerGenerator, setoidNumber)).fold(assert.fail, () => undefined)
   })
 
   it('checkFunctorLaws', () => {
-    const SA = option.getSetoid(setoidString)
-    const SC = option.getSetoid(setoidBoolean)
-    checkLaws(getFunctorLaws(option.option)(OptionStringGenerator, SA, SC)(s => s.length, n => n >= 2)).fold(
+    const fagenerator = OptionStringGenerator
+    const SFA = option.getSetoid(setoidString)
+    const SFC = option.getSetoid(setoidBoolean)
+    checkLaws(getFunctorLaws(option.option)(fagenerator, SFA, SFC)(s => s.length, n => n >= 2)).fold(
       assert.fail,
       () => undefined
     )

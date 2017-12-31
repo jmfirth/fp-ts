@@ -10,6 +10,7 @@ import { identity, compose } from './function'
 import { Either, right, left, either } from './Either'
 import { sequence } from './Traversable'
 import { array } from './Array'
+import { Apply } from './Apply'
 
 export class Law<A> {
   constructor(readonly name: string, readonly property: Property<A>) {}
@@ -26,34 +27,56 @@ export class Law<A> {
 
 export type Laws = Array<Law<any>>
 
+export function getFunctionEquality<A, B>(
+  gen: Generator<A>,
+  S: Setoid<B>
+): (f: (a: A) => B, g: (a: A) => B) => Property<A> {
+  return (f, g) =>
+    property(gen, a => {
+      return S.equals(f(a))(g(a))
+    })
+}
+
+const sequenceEithers = sequence(either, array)
+
 export function checkLaws(laws: Laws, options?: CheckOptions): Either<string, Array<string>> {
-  return sequence(either, array)(laws.map(l => l.check(options)))
+  return sequenceEithers(laws.map(l => l.check(options)))
 }
 
-export function getSetoidLaws<A>(E: Setoid<A>, generator: Generator<A>): Laws {
-  return [
-    new Law(
-      'Setoid: Reflexivity',
-      property(generator, a => {
-        return E.equals(a)(a)
-      })
-    ),
-    new Law(
-      'Setoid: Symmetry',
-      property(generator, generator, (a, b) => {
-        return E.equals(a)(b) ? E.equals(b)(a) : true
-      })
-    ),
-    new Law(
-      'Setoid: Transitivity',
-      property(generator, generator, generator, (a, b, c) => {
-        return E.equals(a)(b) && E.equals(b)(c) ? E.equals(a)(c) : true
-      })
-    )
-  ]
+export function getApplyLaws<F extends HKTS>(
+  F: Apply<F>
+): <A, C>(
+  fagenerator: Generator<HKTAs<F, A>>,
+  SFA: Setoid<HKTAs<F, A>>,
+  SFC: Setoid<HKTAs<F, C>>
+) => <B>(g: (a: A) => B, f: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws
+export function getApplyLaws<F>(
+  F: Apply<F>
+): <A, C>(
+  fagenerator: Generator<HKT<F, A>>,
+  SFA: Setoid<HKT<F, A>>,
+  SFC: Setoid<HKT<F, C>>
+) => <B>(g: (a: A) => B, f: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws
+export function getApplyLaws<F>(
+  F: Apply<F>
+): <A, C>(
+  fagenerator: Generator<HKT<F, A>>,
+  SFA: Setoid<HKT<F, A>>,
+  SFC: Setoid<HKT<F, C>>
+) => <B>(g: (a: A) => B, f: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws {
+  return (fagenerator, SFA, SFC) => (g, f, fab, fbc) =>
+    getFunctorLaws(F)(fagenerator, SFA, SFC)(g, f).concat([
+      new Law(
+        'Apply: Associative composition',
+        getFunctionEquality(fagenerator, SFC)(
+          fa => F.ap(fbc, F.ap(fab, fa)),
+          fa => F.ap(F.ap(F.map(bc => (ab: any) => compose(bc, ab), fbc), fab), fa)
+        )
+      )
+    ])
 }
 
-export function getFieldLaws<A>(F: Field<A>, generator: Generator<A>, E: Setoid<A>, options?: CheckOptions): Laws {
+export function getFieldLaws<A>(F: Field<A>, generator: Generator<A>, E: Setoid<A>): Laws {
   const one = F.one()
   const zero = F.zero()
   const isZero: (a: A) => boolean = E.equals(zero)
@@ -100,43 +123,30 @@ export function getFieldLaws<A>(F: Field<A>, generator: Generator<A>, E: Setoid<
 export function getFunctorLaws<F extends HKTS>(
   F: Functor<F>
 ): <A, C>(
-  generator: Generator<HKTAs<F, A>>,
-  SA: Setoid<HKTAs<F, A>>,
-  SC: Setoid<HKTAs<F, C>>
-) => <B>(g: (a: A) => B, f: (b: B) => C, options?: CheckOptions) => Laws
+  fagenerator: Generator<HKTAs<F, A>>,
+  SFA: Setoid<HKTAs<F, A>>,
+  SFC: Setoid<HKTAs<F, C>>
+) => <B>(g: (a: A) => B, f: (b: B) => C) => Laws
 export function getFunctorLaws<F>(
   F: Functor<F>
 ): <A, C>(
-  generator: Generator<HKT<F, A>>,
-  SA: Setoid<HKT<F, A>>,
-  SC: Setoid<HKT<F, C>>
-) => <B>(g: (a: A) => B, f: (b: B) => C, options?: CheckOptions) => Laws
+  fagenerator: Generator<HKT<F, A>>,
+  SFA: Setoid<HKT<F, A>>,
+  SFC: Setoid<HKT<F, C>>
+) => <B>(g: (a: A) => B, f: (b: B) => C) => Laws
 export function getFunctorLaws<F>(
   F: Functor<F>
 ): <A, C>(
-  generator: Generator<HKT<F, A>>,
-  SA: Setoid<HKT<F, A>>,
-  SC: Setoid<HKT<F, C>>
-) => <B>(g: (a: A) => B, f: (b: B) => C, options?: CheckOptions) => Laws {
-  return <A, B, C>(generator: Generator<HKT<F, A>>, SA: Setoid<HKT<F, A>>, SC: Setoid<HKT<F, C>>) => (
-    g: (a: A) => B,
-    f: (b: B) => C,
-    options?: CheckOptions
-  ) => {
+  fagenerator: Generator<HKT<F, A>>,
+  SFA: Setoid<HKT<F, A>>,
+  SFC: Setoid<HKT<F, C>>
+) => <B>(g: (a: A) => B, f: (b: B) => C) => Laws {
+  return (fagenerator, SFA, SFC) => (g, f, options?: CheckOptions) => {
     return [
-      new Law(
-        'Funtor: Identity',
-        property(generator, fa => {
-          return SA.equals(F.map<A, A>(identity, fa))(fa)
-        })
-      ),
+      new Law('Funtor: Identity', getFunctionEquality(fagenerator, SFA)(fa => F.map(a => a, fa), identity)),
       new Law(
         'Funtor: Composition',
-        property(generator, fa => {
-          const fc1 = F.map(compose(f, g), fa)
-          const fc2 = compose((fb: HKT<F, B>) => F.map(f, fb), (fa: HKT<F, A>) => F.map(g, fa))(fa)
-          return SC.equals(fc1)(fc2)
-        })
+        getFunctionEquality(fagenerator, SFC)(fa => F.map(compose(f, g), fa), fa => F.map(f, F.map(g, fa)))
       )
     ]
   }
@@ -241,6 +251,29 @@ export function getSemiringLaws<A>(S: Semiring<A>, generator: Generator<A>, E: S
         const b = S.mul(a)(zero)
         const c = S.mul(zero)(a)
         return E.equals(b)(c) && E.equals(b)(zero)
+      })
+    )
+  ]
+}
+
+export function getSetoidLaws<A>(E: Setoid<A>, generator: Generator<A>): Laws {
+  return [
+    new Law(
+      'Setoid: Reflexivity',
+      property(generator, a => {
+        return E.equals(a)(a)
+      })
+    ),
+    new Law(
+      'Setoid: Symmetry',
+      property(generator, generator, (a, b) => {
+        return E.equals(a)(b) ? E.equals(b)(a) : true
+      })
+    ),
+    new Law(
+      'Setoid: Transitivity',
+      property(generator, generator, generator, (a, b, c) => {
+        return E.equals(a)(b) && E.equals(b)(c) ? E.equals(a)(c) : true
       })
     )
   ]
