@@ -27,7 +27,7 @@ import {
  *
  * - Identity: `fa => F.ap(F.of(identity), fa) = identity`
  * - Composition: `fa => F.ap(fbc, F.ap(fab, fa)) = fa => F.ap(F.ap(F.ap(F.of(bc => ab => compose(bc, ab)), fbc), fab), fa)`
- * - Homomorphism: `a => F.ap(F.of(g), F.of(a)) = a => F.of(g(a))`
+ * - Homomorphism: `a => F.ap(F.of(ab), F.of(a)) = a => F.of(ab(a))`
  * - Interchange: `a => F.ap(fab, F.of(a)) = a => F.ap(F.of(ab => ab(a)), fab)`
  */
 export interface Applicative<F> extends Apply<F> {

@@ -1,7 +1,17 @@
 import { HKT, HKTS, HKT2S, HKTAs, HKT2As, HKT3S, HKT3As } from './HKT'
 import { Apply, FantasyApply } from './Apply'
 
-/** @typeclass */
+/**
+ * @typeclass
+ *
+ * The `Chain` type class extends the `Apply` type class with a
+ * `chain` operation which composes computations in sequence, using
+ * the return value of one computation to determine the next computation.
+ *
+ * Instances must satisfy the following law in addition to the `Apply` laws:
+ *
+ * - Associativity: `fa => F.chain(bfc, F.chain(afb, fa)) = fa => F.chain(a => F.chain(bfc, afb(a)), fa)`
+ */
 export interface Chain<F> extends Apply<F> {
   chain<A, B>(f: (a: A) => HKT<F, B>, fa: HKT<F, A>): HKT<F, B>
 }

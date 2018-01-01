@@ -12,6 +12,7 @@ import { sequence } from './Traversable'
 import { array } from './Array'
 import { Apply } from './Apply'
 import { Applicative } from './Applicative'
+import { Chain } from './Chain'
 
 export class Law<A> {
   constructor(readonly name: string, readonly property: Property<A>) {}
@@ -51,7 +52,7 @@ export function getApplicativeLaws<F extends HKTS>(
   SFA: Setoid<HKTAs<F, A>>,
   SFC: Setoid<HKTAs<F, C>>,
   SFB: Setoid<HKTAs<F, B>>
-) => (g: (a: A) => B, f: (b: B) => C) => Laws
+) => (ab: (a: A) => B, bc: (b: B) => C) => Laws
 export function getApplicativeLaws<F>(
   F: Applicative<F>
 ): <A, B, C>(
@@ -59,7 +60,7 @@ export function getApplicativeLaws<F>(
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>,
   SFB: Setoid<HKT<F, B>>
-) => (g: (a: A) => B, f: (b: B) => C) => Laws
+) => (ab: (a: A) => B, bc: (b: B) => C) => Laws
 export function getApplicativeLaws<F>(
   F: Applicative<F>
 ): <A, B, C>(
@@ -67,12 +68,12 @@ export function getApplicativeLaws<F>(
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>,
   SFB: Setoid<HKT<F, B>>
-) => (g: (a: A) => B, f: (b: B) => C) => Laws {
-  return (gen, SFA, SFC, SFB) => (g, f) => {
+) => (ab: (a: A) => B, bc: (b: B) => C) => Laws {
+  return (gen, SFA, SFC, SFB) => (ab, bc) => {
     const fagen = gen.then(F.of)
-    const fab = F.of(g)
-    const fbc = F.of(f)
-    return getApplyLaws(F)(fagen, SFA, SFC)(g, f, fab, fbc).concat([
+    const fab = F.of(ab)
+    const fbc = F.of(bc)
+    return getApplyLaws(F)(fagen, SFA, SFC)(ab, bc, fab, fbc).concat([
       new Law('Applicative: Identity', getFunctionEquality(fagen, SFA)(fa => F.ap(F.of(identity), fa), identity)),
       new Law(
         'Applicative: Composition',
@@ -81,7 +82,10 @@ export function getApplicativeLaws<F>(
           fa => F.ap(F.ap(F.ap(F.of((bc: any) => (ab: any) => compose(bc, ab) as any), fbc), fab), fa)
         )
       ),
-      new Law('Applicative: Homomorphism', getFunctionEquality(gen, SFB)(a => F.ap(F.of(g), F.of(a)), a => F.of(g(a)))),
+      new Law(
+        'Applicative: Homomorphism',
+        getFunctionEquality(gen, SFB)(a => F.ap(F.of(ab), F.of(a)), a => F.of(ab(a)))
+      ),
       new Law(
         'Applicative: Interchange',
         getFunctionEquality(gen, SFB)(a => F.ap(fab, F.of(a)), a => F.ap(F.of((ab: any) => ab(a)), fab))
@@ -96,23 +100,23 @@ export function getApplyLaws<F extends HKTS>(
   fagen: Generator<HKTAs<F, A>>,
   SFA: Setoid<HKTAs<F, A>>,
   SFC: Setoid<HKTAs<F, C>>
-) => <B>(g: (a: A) => B, f: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws
+) => <B>(ab: (a: A) => B, bc: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws
 export function getApplyLaws<F>(
   F: Apply<F>
 ): <A, C>(
   fagen: Generator<HKT<F, A>>,
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>
-) => <B>(g: (a: A) => B, f: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws
+) => <B>(ab: (a: A) => B, bc: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws
 export function getApplyLaws<F>(
   F: Apply<F>
 ): <A, C>(
   fagen: Generator<HKT<F, A>>,
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>
-) => <B>(g: (a: A) => B, f: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws {
-  return (fagenerator, SFA, SFC) => (g, f, fab, fbc) =>
-    getFunctorLaws(F)(fagenerator, SFA, SFC)(g, f).concat([
+) => <B>(ab: (a: A) => B, bc: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws {
+  return (fagenerator, SFA, SFC) => (ab, bc, fab, fbc) =>
+    getFunctorLaws(F)(fagenerator, SFA, SFC)(ab, bc).concat([
       new Law(
         'Apply: Associative composition',
         getFunctionEquality(fagenerator, SFC)(
@@ -121,6 +125,61 @@ export function getApplyLaws<F>(
         )
       )
     ])
+}
+
+export function getChainLaws<F extends HKTS>(
+  F: Chain<F>
+): <A, C>(
+  fagen: Generator<HKTAs<F, A>>,
+  SFA: Setoid<HKTAs<F, A>>,
+  SFC: Setoid<HKTAs<F, C>>
+) => <B>(
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  fab: HKT<F, (a: A) => B>,
+  fbc: HKT<F, (b: B) => C>,
+  afb: (a: A) => HKT<F, B>,
+  bfc: (b: B) => HKT<F, C>
+) => Laws
+export function getChainLaws<F>(
+  F: Chain<F>
+): <A, C>(
+  fagen: Generator<HKT<F, A>>,
+  SFA: Setoid<HKT<F, A>>,
+  SFC: Setoid<HKT<F, C>>
+) => <B>(
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  fab: HKT<F, (a: A) => B>,
+  fbc: HKT<F, (b: B) => C>,
+  afb: (a: A) => HKT<F, B>,
+  bfc: (b: B) => HKT<F, C>
+) => Laws
+export function getChainLaws<F>(
+  F: Chain<F>
+): <A, C>(
+  fagen: Generator<HKT<F, A>>,
+  SFA: Setoid<HKT<F, A>>,
+  SFC: Setoid<HKT<F, C>>
+) => <B>(
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  fab: HKT<F, (a: A) => B>,
+  fbc: HKT<F, (b: B) => C>,
+  afb: (a: A) => HKT<F, B>,
+  bfc: (b: B) => HKT<F, C>
+) => Laws {
+  return (fagen, SFA, SFC) => (ab, bc, fab, fbc, afb, bfc) => {
+    return getApplyLaws(F)(fagen, SFA, SFC)(ab, bc, fab, fbc).concat([
+      new Law(
+        'Chain: Associativity',
+        getFunctionEquality(fagen, SFC)(
+          fa => F.chain(bfc, F.chain(afb, fa)),
+          fa => F.chain(a => F.chain(bfc, afb(a)), fa)
+        )
+      )
+    ])
+  }
 }
 
 export function getFieldLaws<A>(F: Field<A>, gen: Generator<A>, E: Setoid<A>): Laws {
@@ -173,27 +232,27 @@ export function getFunctorLaws<F extends HKTS>(
   fagen: Generator<HKTAs<F, A>>,
   SFA: Setoid<HKTAs<F, A>>,
   SFC: Setoid<HKTAs<F, C>>
-) => <B>(g: (a: A) => B, f: (b: B) => C) => Laws
+) => <B>(ab: (a: A) => B, bc: (b: B) => C) => Laws
 export function getFunctorLaws<F>(
   F: Functor<F>
 ): <A, C>(
   fagen: Generator<HKT<F, A>>,
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>
-) => <B>(g: (a: A) => B, f: (b: B) => C) => Laws
+) => <B>(ab: (a: A) => B, bc: (b: B) => C) => Laws
 export function getFunctorLaws<F>(
   F: Functor<F>
 ): <A, C>(
   fagen: Generator<HKT<F, A>>,
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>
-) => <B>(g: (a: A) => B, f: (b: B) => C) => Laws {
-  return (fagenerator, SFA, SFC) => (g, f) => {
+) => <B>(ab: (a: A) => B, bc: (b: B) => C) => Laws {
+  return (fagenerator, SFA, SFC) => (ab, bc) => {
     return [
       new Law('Funtor: Identity', getFunctionEquality(fagenerator, SFA)(fa => F.map(a => a, fa), identity)),
       new Law(
         'Funtor: Composition',
-        getFunctionEquality(fagenerator, SFC)(fa => F.map(compose(f, g), fa), fa => F.map(f, F.map(g, fa)))
+        getFunctionEquality(fagenerator, SFC)(fa => F.map(compose(bc, ab), fa), fa => F.map(bc, F.map(ab, fa)))
       )
     ]
   }

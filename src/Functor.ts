@@ -13,7 +13,7 @@ import { constant } from './function'
  * Instances must satisfy the following laws:
  *
  * - Identity: `fa => F.map(identity, fa) = identity`
- * - Composition: `fa => F.map(compose(f, g), fa) = F.map(f, F.map(g, fa))`
+ * - Composition: `fa => F.map(compose(bc, ab), fa) = F.map(bc, F.map(ab, fa))`
  */
 export interface Functor<F> {
   readonly URI: F

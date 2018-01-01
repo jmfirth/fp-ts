@@ -3,6 +3,7 @@ import {
   checkLaws,
   getApplicativeLaws,
   getApplyLaws,
+  getChainLaws,
   getSetoidLaws,
   getOrdLaws,
   getSemiringLaws,
@@ -28,20 +29,36 @@ describe('laws', () => {
     const SFA = option.getSetoid(setoidString)
     const SFC = option.getSetoid(setoidBoolean)
     const SFB = option.getSetoid(setoidNumber)
-    const g = (s: string) => s.length
-    const f = (n: number) => n >= 2
-    checkLaws(getApplicativeLaws(option.option)(agenerator, SFA, SFC, SFB)(g, f)).fold(assert.fail, () => undefined)
+    const ab = (a: string) => a.length
+    const bc = (b: number) => b >= 2
+    checkLaws(getApplicativeLaws(option.option)(agenerator, SFA, SFC, SFB)(ab, bc)).fold(assert.fail, () => undefined)
   })
 
   it('checkApplyLaws', () => {
     const fagenerator = OptionStringGenerator
     const SFA = option.getSetoid(setoidString)
     const SFC = option.getSetoid(setoidBoolean)
-    const g = (s: string) => s.length
-    const f = (n: number) => n >= 2
-    const fab = option.option.of(g)
-    const fbc = option.option.of(f)
-    checkLaws(getApplyLaws(option.option)(fagenerator, SFA, SFC)(g, f, fab, fbc)).fold(assert.fail, () => undefined)
+    const ab = (a: string) => a.length
+    const bc = (b: number) => b >= 2
+    const fab = option.option.of(ab)
+    const fbc = option.option.of(bc)
+    checkLaws(getApplyLaws(option.option)(fagenerator, SFA, SFC)(ab, bc, fab, fbc)).fold(assert.fail, () => undefined)
+  })
+
+  it('getChainLaws', () => {
+    const fagenerator = OptionStringGenerator
+    const SFA = option.getSetoid(setoidString)
+    const SFC = option.getSetoid(setoidBoolean)
+    const ab = (a: string) => a.length
+    const bc = (b: number) => b >= 2
+    const fab = option.option.of(ab)
+    const fbc = option.option.of(bc)
+    const afb = (a: string) => option.option.of(ab(a))
+    const bfc = (b: number) => option.option.of(bc(b))
+    checkLaws(getChainLaws(option.option)(fagenerator, SFA, SFC)(ab, bc, fab, fbc, afb, bfc)).fold(
+      assert.fail,
+      () => undefined
+    )
   })
 
   it('checkFieldLaws', () => {
@@ -52,10 +69,9 @@ describe('laws', () => {
     const fagenerator = OptionStringGenerator
     const SFA = option.getSetoid(setoidString)
     const SFC = option.getSetoid(setoidBoolean)
-    checkLaws(getFunctorLaws(option.option)(fagenerator, SFA, SFC)(s => s.length, n => n >= 2)).fold(
-      assert.fail,
-      () => undefined
-    )
+    const ab = (a: string) => a.length
+    const bc = (b: number) => b >= 2
+    checkLaws(getFunctorLaws(option.option)(fagenerator, SFA, SFC)(ab, bc)).fold(assert.fail, () => undefined)
   })
 
   it('checkOrdLaws', () => {
