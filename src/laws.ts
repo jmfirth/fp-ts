@@ -11,6 +11,7 @@ import { Either, right, left, either } from './Either'
 import { sequence } from './Traversable'
 import { array } from './Array'
 import { Apply } from './Apply'
+import { Applicative } from './Applicative'
 
 export class Law<A> {
   constructor(readonly name: string, readonly property: Property<A>) {}
@@ -43,24 +44,70 @@ export function checkLaws(laws: Laws, options?: CheckOptions): Either<string, Ar
   return sequenceEithers(laws.map(l => l.check(options)))
 }
 
+export function getApplicativeLaws<F extends HKTS>(
+  F: Applicative<F>
+): <A, B, C>(
+  gen: Generator<A>,
+  SFA: Setoid<HKTAs<F, A>>,
+  SFC: Setoid<HKTAs<F, C>>,
+  SFB: Setoid<HKTAs<F, B>>
+) => (g: (a: A) => B, f: (b: B) => C) => Laws
+export function getApplicativeLaws<F>(
+  F: Applicative<F>
+): <A, B, C>(
+  gen: Generator<A>,
+  SFA: Setoid<HKT<F, A>>,
+  SFC: Setoid<HKT<F, C>>,
+  SFB: Setoid<HKT<F, B>>
+) => (g: (a: A) => B, f: (b: B) => C) => Laws
+export function getApplicativeLaws<F>(
+  F: Applicative<F>
+): <A, B, C>(
+  gen: Generator<A>,
+  SFA: Setoid<HKT<F, A>>,
+  SFC: Setoid<HKT<F, C>>,
+  SFB: Setoid<HKT<F, B>>
+) => (g: (a: A) => B, f: (b: B) => C) => Laws {
+  return (gen, SFA, SFC, SFB) => (g, f) => {
+    const fagen = gen.then(F.of)
+    const fab = F.of(g)
+    const fbc = F.of(f)
+    return getApplyLaws(F)(fagen, SFA, SFC)(g, f, fab, fbc).concat([
+      new Law('Applicative: Identity', getFunctionEquality(fagen, SFA)(fa => F.ap(F.of(identity), fa), identity)),
+      new Law(
+        'Applicative: Composition',
+        getFunctionEquality(fagen, SFC)(
+          fa => F.ap(fbc, F.ap(fab, fa)),
+          fa => F.ap(F.ap(F.ap(F.of((bc: any) => (ab: any) => compose(bc, ab) as any), fbc), fab), fa)
+        )
+      ),
+      new Law('Applicative: Homomorphism', getFunctionEquality(gen, SFB)(a => F.ap(F.of(g), F.of(a)), a => F.of(g(a)))),
+      new Law(
+        'Applicative: Interchange',
+        getFunctionEquality(gen, SFB)(a => F.ap(fab, F.of(a)), a => F.ap(F.of((ab: any) => ab(a)), fab))
+      )
+    ])
+  }
+}
+
 export function getApplyLaws<F extends HKTS>(
   F: Apply<F>
 ): <A, C>(
-  fagenerator: Generator<HKTAs<F, A>>,
+  fagen: Generator<HKTAs<F, A>>,
   SFA: Setoid<HKTAs<F, A>>,
   SFC: Setoid<HKTAs<F, C>>
 ) => <B>(g: (a: A) => B, f: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws
 export function getApplyLaws<F>(
   F: Apply<F>
 ): <A, C>(
-  fagenerator: Generator<HKT<F, A>>,
+  fagen: Generator<HKT<F, A>>,
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>
 ) => <B>(g: (a: A) => B, f: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws
 export function getApplyLaws<F>(
   F: Apply<F>
 ): <A, C>(
-  fagenerator: Generator<HKT<F, A>>,
+  fagen: Generator<HKT<F, A>>,
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>
 ) => <B>(g: (a: A) => B, f: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws {
@@ -76,32 +123,32 @@ export function getApplyLaws<F>(
     ])
 }
 
-export function getFieldLaws<A>(F: Field<A>, generator: Generator<A>, E: Setoid<A>): Laws {
+export function getFieldLaws<A>(F: Field<A>, gen: Generator<A>, E: Setoid<A>): Laws {
   const one = F.one()
   const zero = F.zero()
   const isZero: (a: A) => boolean = E.equals(zero)
-  return getRingLaws(F, generator, E).concat([
+  return getRingLaws(F, gen, E).concat([
     new Law(
       'Field: Commutative multiplication',
-      property(generator, generator, (a, b) => {
+      property(gen, gen, (a, b) => {
         return E.equals(F.mul(a)(b))(F.mul(b)(a))
       })
     ),
     new Law(
       'Field: Integral domain',
-      property(generator, generator, (a, b) => {
+      property(gen, gen, (a, b) => {
         return !E.equals(a)(zero) && !E.equals(b)(zero) ? !E.equals(F.mul(a)(b))(zero) : !E.equals(one)(zero)
       })
     ),
     new Law(
       'Field: Nonnegativity',
-      property(generator, a => {
+      property(gen, a => {
         return F.degree(a) >= 0
       })
     ),
     new Law(
       'Field: Quotient/remainder',
-      property(generator, generator, (a, b) => {
+      property(gen, gen, (a, b) => {
         if (!isZero(b)) {
           const q = F.div(a)(b)
           const r = F.mod(a)(b)
@@ -113,7 +160,7 @@ export function getFieldLaws<A>(F: Field<A>, generator: Generator<A>, E: Setoid<
     ),
     new Law(
       'Field: Submultiplicative',
-      property(generator, generator, (a, b) => {
+      property(gen, gen, (a, b) => {
         return !isZero(a) && !isZero(b) ? F.degree(a) <= F.degree(F.mul(a)(b)) : true
       })
     )
@@ -123,25 +170,25 @@ export function getFieldLaws<A>(F: Field<A>, generator: Generator<A>, E: Setoid<
 export function getFunctorLaws<F extends HKTS>(
   F: Functor<F>
 ): <A, C>(
-  fagenerator: Generator<HKTAs<F, A>>,
+  fagen: Generator<HKTAs<F, A>>,
   SFA: Setoid<HKTAs<F, A>>,
   SFC: Setoid<HKTAs<F, C>>
 ) => <B>(g: (a: A) => B, f: (b: B) => C) => Laws
 export function getFunctorLaws<F>(
   F: Functor<F>
 ): <A, C>(
-  fagenerator: Generator<HKT<F, A>>,
+  fagen: Generator<HKT<F, A>>,
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>
 ) => <B>(g: (a: A) => B, f: (b: B) => C) => Laws
 export function getFunctorLaws<F>(
   F: Functor<F>
 ): <A, C>(
-  fagenerator: Generator<HKT<F, A>>,
+  fagen: Generator<HKT<F, A>>,
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>
 ) => <B>(g: (a: A) => B, f: (b: B) => C) => Laws {
-  return (fagenerator, SFA, SFC) => (g, f, options?: CheckOptions) => {
+  return (fagenerator, SFA, SFC) => (g, f) => {
     return [
       new Law('Funtor: Identity', getFunctionEquality(fagenerator, SFA)(fa => F.map(a => a, fa), identity)),
       new Law(
@@ -152,41 +199,41 @@ export function getFunctorLaws<F>(
   }
 }
 
-export function getOrdLaws<A>(O: Ord<A>, generator: Generator<A>, E: Setoid<A>): Laws {
+export function getOrdLaws<A>(O: Ord<A>, gen: Generator<A>, E: Setoid<A>): Laws {
   return [
     new Law(
       'Ord: Compatibility with Setoid',
-      property(generator, generator, (a, b) => {
+      property(gen, gen, (a, b) => {
         return O.compare(a)(b) === 'EQ' ? E.equals(a)(b) : true
       })
     ),
     new Law(
       'Ord: Reflexivity',
-      property(generator, a => {
+      property(gen, a => {
         return O.compare(a)(a) !== 'GT'
       })
     ),
     new Law(
       'Ord: Antisymmetry',
-      property(generator, generator, (a, b) => {
+      property(gen, gen, (a, b) => {
         return O.compare(a)(b) !== 'GT' && O.compare(b)(a) !== 'GT' ? E.equals(a)(b) : true
       })
     ),
     new Law(
       'Ord: Transitivity',
-      property(generator, generator, generator, (a, b, c) => {
+      property(gen, gen, gen, (a, b, c) => {
         return O.compare(a)(b) !== 'GT' && O.compare(b)(c) !== 'GT' ? O.compare(a)(c) !== 'GT' : true
       })
     )
   ]
 }
 
-export function getRingLaws<A>(R: Ring<A>, generator: Generator<A>, E: Setoid<A>): Laws {
+export function getRingLaws<A>(R: Ring<A>, gen: Generator<A>, E: Setoid<A>): Laws {
   const zero = R.zero()
-  return getSemiringLaws(R, generator, E).concat([
+  return getSemiringLaws(R, gen, E).concat([
     new Law(
       'Ring: Additive inverse',
-      property(generator, a => {
+      property(gen, a => {
         const b = R.sub(a)(a)
         const c = R.add(R.sub(zero)(a))(a)
         return E.equals(b)(c) && E.equals(b)(zero)
@@ -195,19 +242,19 @@ export function getRingLaws<A>(R: Ring<A>, generator: Generator<A>, E: Setoid<A>
   ])
 }
 
-export function getSemiringLaws<A>(S: Semiring<A>, generator: Generator<A>, E: Setoid<A>): Laws {
+export function getSemiringLaws<A>(S: Semiring<A>, gen: Generator<A>, E: Setoid<A>): Laws {
   const zero = S.zero()
   const one = S.one()
   return [
     new Law(
       'Semiring: Addition Associativity',
-      property(generator, generator, generator, (a, b, c) => {
+      property(gen, gen, gen, (a, b, c) => {
         return E.equals(S.add(S.add(a)(b))(c))(S.add(a)(S.add(b)(c)))
       })
     ),
     new Law(
       'Semiring: Addition Identity',
-      property(generator, a => {
+      property(gen, a => {
         const b = S.add(a)(zero)
         const c = S.add(zero)(a)
         return E.equals(b)(c) && E.equals(b)(a)
@@ -215,19 +262,19 @@ export function getSemiringLaws<A>(S: Semiring<A>, generator: Generator<A>, E: S
     ),
     new Law(
       'Semiring: Addition Commutativity',
-      property(generator, generator, (a, b) => {
+      property(gen, gen, (a, b) => {
         return E.equals(S.add(a)(b))(S.add(b)(a))
       })
     ),
     new Law(
       'Semiring: Multiplication Associativity',
-      property(generator, generator, generator, (a, b, c) => {
+      property(gen, gen, gen, (a, b, c) => {
         return E.equals(S.mul(S.mul(a)(b))(c))(S.mul(a)(S.mul(b)(c)))
       })
     ),
     new Law(
       'Semiring: Multiplication Identity',
-      property(generator, a => {
+      property(gen, a => {
         const b = S.mul(a)(one)
         const c = S.mul(one)(a)
         return E.equals(b)(c) && E.equals(b)(a)
@@ -235,19 +282,19 @@ export function getSemiringLaws<A>(S: Semiring<A>, generator: Generator<A>, E: S
     ),
     new Law(
       'Semiring: Left distributivity',
-      property(generator, generator, generator, (a, b, c) => {
+      property(gen, gen, gen, (a, b, c) => {
         return E.equals(S.mul(a)(S.add(b)(c)))(S.add(S.mul(a)(b))(S.mul(a)(c)))
       })
     ),
     new Law(
       'Semiring: Right distributivity',
-      property(generator, generator, generator, (a, b, c) => {
+      property(gen, gen, gen, (a, b, c) => {
         return E.equals(S.mul(S.add(a)(b))(c))(S.add(S.mul(a)(c))(S.mul(b)(c)))
       })
     ),
     new Law(
       'Semiring: Annihilation',
-      property(generator, a => {
+      property(gen, a => {
         const b = S.mul(a)(zero)
         const c = S.mul(zero)(a)
         return E.equals(b)(c) && E.equals(b)(zero)
@@ -256,23 +303,23 @@ export function getSemiringLaws<A>(S: Semiring<A>, generator: Generator<A>, E: S
   ]
 }
 
-export function getSetoidLaws<A>(E: Setoid<A>, generator: Generator<A>): Laws {
+export function getSetoidLaws<A>(E: Setoid<A>, gen: Generator<A>): Laws {
   return [
     new Law(
       'Setoid: Reflexivity',
-      property(generator, a => {
+      property(gen, a => {
         return E.equals(a)(a)
       })
     ),
     new Law(
       'Setoid: Symmetry',
-      property(generator, generator, (a, b) => {
+      property(gen, gen, (a, b) => {
         return E.equals(a)(b) ? E.equals(b)(a) : true
       })
     ),
     new Law(
       'Setoid: Transitivity',
-      property(generator, generator, generator, (a, b, c) => {
+      property(gen, gen, gen, (a, b, c) => {
         return E.equals(a)(b) && E.equals(b)(c) ? E.equals(a)(c) : true
       })
     )

@@ -1,6 +1,7 @@
 import * as assert from 'assert'
 import {
   checkLaws,
+  getApplicativeLaws,
   getApplyLaws,
   getSetoidLaws,
   getOrdLaws,
@@ -22,6 +23,16 @@ const IntegerGenerator: Generator<number> = gen.int
 const OptionStringGenerator: Generator<option.Option<string>> = gen.string.then(n => option.of(n))
 
 describe('laws', () => {
+  it('checkApplicativeLaws', () => {
+    const agenerator = gen.string
+    const SFA = option.getSetoid(setoidString)
+    const SFC = option.getSetoid(setoidBoolean)
+    const SFB = option.getSetoid(setoidNumber)
+    const g = (s: string) => s.length
+    const f = (n: number) => n >= 2
+    checkLaws(getApplicativeLaws(option.option)(agenerator, SFA, SFC, SFB)(g, f)).fold(assert.fail, () => undefined)
+  })
+
   it('checkApplyLaws', () => {
     const fagenerator = OptionStringGenerator
     const SFA = option.getSetoid(setoidString)
