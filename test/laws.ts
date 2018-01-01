@@ -1,6 +1,7 @@
 import * as assert from 'assert'
 import {
   checkLaws,
+  getMonadLaws,
   getApplicativeLaws,
   getApplyLaws,
   getChainLaws,
@@ -18,75 +19,61 @@ import { fieldInteger, fieldNumber } from '../src/Field'
 import * as option from '../src/Option'
 
 const NumberGenerator: Generator<number> = gen.number.suchThat(n => n !== Infinity && n !== -Infinity && !isNaN(n))
-
 const IntegerGenerator: Generator<number> = gen.int
-
 const OptionStringGenerator: Generator<option.Option<string>> = gen.string.then(n => option.of(n))
+const agenerator = gen.string
+const fagenerator = OptionStringGenerator
+const SFA = option.getSetoid(setoidString)
+const SFC = option.getSetoid(setoidBoolean)
+const SFB = option.getSetoid(setoidNumber)
+const ab = (a: string) => a.length
+const bc = (b: number) => b >= 2
+const fab = option.option.of(ab)
+const fbc = option.option.of(bc)
+const afb = (a: string) => option.option.of(ab(a))
+const bfc = (b: number) => option.option.of(bc(b))
 
 describe('laws', () => {
-  it('checkApplicativeLaws', () => {
-    const agenerator = gen.string
-    const SFA = option.getSetoid(setoidString)
-    const SFC = option.getSetoid(setoidBoolean)
-    const SFB = option.getSetoid(setoidNumber)
-    const ab = (a: string) => a.length
-    const bc = (b: number) => b >= 2
+  it('getApplicativeLaws', () => {
     checkLaws(getApplicativeLaws(option.option)(agenerator, SFA, SFC, SFB)(ab, bc)).fold(assert.fail, () => undefined)
   })
 
-  it('checkApplyLaws', () => {
-    const fagenerator = OptionStringGenerator
-    const SFA = option.getSetoid(setoidString)
-    const SFC = option.getSetoid(setoidBoolean)
-    const ab = (a: string) => a.length
-    const bc = (b: number) => b >= 2
-    const fab = option.option.of(ab)
-    const fbc = option.option.of(bc)
+  it('getApplyLaws', () => {
     checkLaws(getApplyLaws(option.option)(fagenerator, SFA, SFC)(ab, bc, fab, fbc)).fold(assert.fail, () => undefined)
   })
 
   it('getChainLaws', () => {
-    const fagenerator = OptionStringGenerator
-    const SFA = option.getSetoid(setoidString)
-    const SFC = option.getSetoid(setoidBoolean)
-    const ab = (a: string) => a.length
-    const bc = (b: number) => b >= 2
-    const fab = option.option.of(ab)
-    const fbc = option.option.of(bc)
-    const afb = (a: string) => option.option.of(ab(a))
-    const bfc = (b: number) => option.option.of(bc(b))
     checkLaws(getChainLaws(option.option)(fagenerator, SFA, SFC)(ab, bc, fab, fbc, afb, bfc)).fold(
       assert.fail,
       () => undefined
     )
   })
 
-  it('checkFieldLaws', () => {
+  it('getFieldLaws', () => {
     checkLaws(getFieldLaws(fieldInteger, IntegerGenerator, setoidNumber)).fold(assert.fail, () => undefined)
   })
 
-  it('checkFunctorLaws', () => {
-    const fagenerator = OptionStringGenerator
-    const SFA = option.getSetoid(setoidString)
-    const SFC = option.getSetoid(setoidBoolean)
-    const ab = (a: string) => a.length
-    const bc = (b: number) => b >= 2
+  it('getFunctorLaws', () => {
     checkLaws(getFunctorLaws(option.option)(fagenerator, SFA, SFC)(ab, bc)).fold(assert.fail, () => undefined)
   })
 
-  it('checkOrdLaws', () => {
+  it('getMonadLaws', () => {
+    checkLaws(getMonadLaws(option.option)(agenerator, SFA, SFC, SFB)(ab, bc)).fold(assert.fail, () => undefined)
+  })
+
+  it('getOrdLaws', () => {
     checkLaws(getOrdLaws(ordNumber, NumberGenerator, setoidNumber)).fold(assert.fail, () => undefined)
   })
 
-  it('checkRingLaws', () => {
+  it('getRingLaws', () => {
     checkLaws(getRingLaws(fieldNumber, IntegerGenerator, setoidNumber)).fold(assert.fail, () => undefined)
   })
 
-  it('checkSemiringLaws', () => {
+  it('getSemiringLaws', () => {
     checkLaws(getSemiringLaws(fieldNumber, IntegerGenerator, setoidNumber)).fold(assert.fail, () => undefined)
   })
 
-  it('checkSetoidLaws', () => {
+  it('getSetoidLaws', () => {
     checkLaws(getSetoidLaws(setoidNumber, NumberGenerator)).fold(assert.fail, () => undefined)
   })
 })

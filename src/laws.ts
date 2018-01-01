@@ -13,6 +13,7 @@ import { array } from './Array'
 import { Apply } from './Apply'
 import { Applicative } from './Applicative'
 import { Chain } from './Chain'
+import { Monad } from './Monad'
 
 export class Law<A> {
   constructor(readonly name: string, readonly property: Property<A>) {}
@@ -115,11 +116,11 @@ export function getApplyLaws<F>(
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>
 ) => <B>(ab: (a: A) => B, bc: (b: B) => C, fab: HKT<F, (a: A) => B>, fbc: HKT<F, (b: B) => C>) => Laws {
-  return (fagenerator, SFA, SFC) => (ab, bc, fab, fbc) =>
-    getFunctorLaws(F)(fagenerator, SFA, SFC)(ab, bc).concat([
+  return (fagen, SFA, SFC) => (ab, bc, fab, fbc) =>
+    getFunctorLaws(F)(fagen, SFA, SFC)(ab, bc).concat([
       new Law(
         'Apply: Associative composition',
-        getFunctionEquality(fagenerator, SFC)(
+        getFunctionEquality(fagen, SFC)(
           fa => F.ap(fbc, F.ap(fab, fa)),
           fa => F.ap(F.ap(F.map(bc => (ab: any) => compose(bc, ab), fbc), fab), fa)
         )
@@ -247,14 +248,50 @@ export function getFunctorLaws<F>(
   SFA: Setoid<HKT<F, A>>,
   SFC: Setoid<HKT<F, C>>
 ) => <B>(ab: (a: A) => B, bc: (b: B) => C) => Laws {
-  return (fagenerator, SFA, SFC) => (ab, bc) => {
+  return (fagen, SFA, SFC) => (ab, bc) => {
     return [
-      new Law('Funtor: Identity', getFunctionEquality(fagenerator, SFA)(fa => F.map(a => a, fa), identity)),
+      new Law('Funtor: Identity', getFunctionEquality(fagen, SFA)(fa => F.map(a => a, fa), identity)),
       new Law(
         'Funtor: Composition',
-        getFunctionEquality(fagenerator, SFC)(fa => F.map(compose(bc, ab), fa), fa => F.map(bc, F.map(ab, fa)))
+        getFunctionEquality(fagen, SFC)(fa => F.map(compose(bc, ab), fa), fa => F.map(bc, F.map(ab, fa)))
       )
     ]
+  }
+}
+
+export function getMonadLaws<F extends HKTS>(
+  F: Monad<F>
+): <A, B, C>(
+  gen: Generator<A>,
+  SFA: Setoid<HKTAs<F, A>>,
+  SFC: Setoid<HKTAs<F, C>>,
+  SFB: Setoid<HKTAs<F, B>>
+) => (ab: (a: A) => B, bc: (b: B) => C) => Laws
+export function getMonadLaws<F>(
+  F: Monad<F>
+): <A, B, C>(
+  gen: Generator<A>,
+  SFA: Setoid<HKT<F, A>>,
+  SFC: Setoid<HKT<F, C>>,
+  SFB: Setoid<HKT<F, B>>
+) => (ab: (a: A) => B, bc: (b: B) => C) => Laws
+export function getMonadLaws<F>(
+  F: Monad<F>
+): <A, B, C>(
+  gen: Generator<A>,
+  SFA: Setoid<HKT<F, A>>,
+  SFC: Setoid<HKT<F, C>>,
+  SFB: Setoid<HKT<F, B>>
+) => (ab: (a: A) => B, bc: (b: B) => C) => Laws {
+  return <A, B, C>(gen: Generator<A>, SFA: Setoid<HKT<F, A>>, SFC: Setoid<HKT<F, C>>, SFB: Setoid<HKT<F, B>>) => (
+    ab: (a: A) => B,
+    bc: (b: B) => C
+  ) => {
+    const afb = (a: A) => F.of(ab(a))
+    return getApplicativeLaws(F)(gen, SFA, SFC, SFB)(ab, bc).concat([
+      new Law('Monad: Left Identity', getFunctionEquality(gen, SFB)(a => F.chain(afb, F.of(a)), afb)),
+      new Law('Monad: Right Identity', getFunctionEquality(gen, SFB)(a => F.chain(b => F.of(b), afb(a)), afb))
+    ])
   }
 }
 
