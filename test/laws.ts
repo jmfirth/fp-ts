@@ -1,6 +1,8 @@
 import * as assert from 'assert'
 import {
   checkLaws,
+  getSemigroupLaws,
+  getMonoidLaws,
   getMonadLaws,
   getApplicativeLaws,
   getApplyLaws,
@@ -17,6 +19,7 @@ import { setoidNumber, setoidString, setoidBoolean } from '../src/Setoid'
 import { ordNumber } from '../src/Ord'
 import { fieldInteger, fieldNumber } from '../src/Field'
 import * as option from '../src/Option'
+import { monoidSum, monoidString } from '../src/Monoid'
 
 const NumberGenerator: Generator<number> = gen.number.suchThat(n => n !== Infinity && n !== -Infinity && !isNaN(n))
 const IntegerGenerator: Generator<number> = gen.int
@@ -34,6 +37,15 @@ const afb = (a: string) => option.option.of(ab(a))
 const bfc = (b: number) => option.option.of(bc(b))
 
 describe('laws', () => {
+  it('getSemigroupLaws', () => {
+    const S = option.getSemigroup(monoidString)
+    checkLaws(getSemigroupLaws(S, OptionStringGenerator, SFA)).fold(assert.fail, () => undefined)
+  })
+
+  it('getMonoidLaws', () => {
+    checkLaws(getMonoidLaws(monoidSum, IntegerGenerator, setoidNumber)).fold(assert.fail, () => undefined)
+  })
+
   it('getApplicativeLaws', () => {
     checkLaws(getApplicativeLaws(option.option)(agenerator, SFA, SFC, SFB)(ab, bc)).fold(assert.fail, () => undefined)
   })

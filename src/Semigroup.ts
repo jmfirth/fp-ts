@@ -1,6 +1,17 @@
 import { Ord, min, max } from './Ord'
 
-/** @typeclass */
+/**
+ * @typeclass
+ *
+ * The `Semigroup` type class identifies an associative operation on a type.
+ *
+ * Instances are required to satisfy the following law:
+ *
+ * - Associativity: `concat(concat(a)(b))(c) = concat(a)(concat(b)(c))`
+ *
+ * One example of a `Semigroup` is `string`, with `concat` defined as string
+ * concatenation.
+ */
 export interface Semigroup<A> {
   concat: (x: A) => (y: A) => A
 }

@@ -13,7 +13,19 @@ import {
 } from './Semigroup'
 import { constant, Endomorphism, identity, compose } from './function'
 
-/** @typeclass */
+/**
+ * @typeclass
+ *
+ * A `Monoid` is a `Semigroup` with a value `empty`, which is both a
+ * left and right unit for the associative operation `concat`:
+ *
+ * - Left identity: `concat(empty)(a) = a`
+ * - Right identity: `concat(a)(empty) = a`
+ *
+ * `Monoid`s are commonly used as the result of fold operations, where
+ * `concat` is used to combine individual results, and `empty` gives the result
+ * of folding an empty collection of elements.
+ */
 export interface Monoid<A> extends Semigroup<A> {
   empty: () => A
 }
